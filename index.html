@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A/B Test Calculator</title>
+<meta name="description" content="Sample size, results and money for A/B tests, with every formula shown with your numbers plugged in.">
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#fff; --ink:#1d1f23; --muted:#6c7079; --line:#e4e4df; --soft:#f1f1ec;
+  --accent:#4b5bd6; --good:#21885b; --bad:#c43d35; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141518; --panel:#1c1d21; --ink:#e9eaee; --muted:#9da1aa; --line:#2d2f35; --soft:#23252a; --accent:#8794ff; --good:#4cc08a; --bad:#ec6a62; --shadow:0 4px 16px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{ --bg:#141518; --panel:#1c1d21; --ink:#e9eaee; --muted:#9da1aa; --line:#2d2f35; --soft:#23252a; --accent:#8794ff; --good:#4cc08a; --bad:#ec6a62; --shadow:0 4px 16px rgba(0,0,0,.35); }
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+.grid > *{min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px}
+h1{font-size:26px;margin:6px 0 2px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0}
+.tabs button{font:600 15px inherit;font-family:inherit;border:0;background:none;color:var(--muted);padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.field{margin-bottom:12px}
+.field label{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px}
+.field label span{font-weight:400;color:var(--muted)}
+.field input,.field select{width:100%;font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.field input:focus,.field select:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,transparent);border-color:var(--accent)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+.result{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--soft);border-radius:10px;padding:12px}
+.stat b{display:block;font-size:22px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:12px;color:var(--muted)}
+.verdict{border-radius:10px;padding:12px 14px;margin:10px 0;font-weight:600;overflow-wrap:anywhere}
+.verdict.yes{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+.verdict.no{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
+details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;font-size:14px}
+.formula{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;background:var(--soft);border-radius:8px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:pre}
+.formula .c{color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:6px 0}
+.err{color:var(--bad);font-size:13px;min-height:18px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer}
+.ci{position:relative;height:44px;margin:8px 0 4px}
+.ci .axis{position:absolute;left:0;right:0;top:22px;height:1px;background:var(--line)}
+.ci .bar{position:absolute;top:16px;height:12px;border-radius:6px;background:color-mix(in srgb,var(--accent) 35%,transparent)}
+.ci .pt{position:absolute;top:13px;width:3px;height:18px;background:var(--accent);border-radius:2px}
+.ci .mark{position:absolute;top:6px;bottom:6px;width:0;border-left:2px dashed}
+.ci .lab{position:absolute;top:30px;font-size:11px;color:var(--muted);transform:translateX(-50%);white-space:nowrap}
+@media (max-width:780px){ .grid{grid-template-columns:1fr} .result{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>🧪 A/B Test Calculator</h1><div class="muted">Plan the test, read the result, put a dollar value on it. Every formula is shown with your numbers plugged in.</div></div>
+    <button class="btn" id="share" title="Copy a link with these inputs">🔗 Copy link</button>
+  </header>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="size" aria-selected="true">1 · Sample size</button>
+    <button role="tab" data-tab="results" aria-selected="false">2 · Results</button>
+    <button role="tab" data-tab="money" aria-selected="false">3 · Money</button>
+  </div>
+
+  <!-- ---------------- Tab 1 ---------------- -->
+  <section id="tab-size" class="grid">
+    <div class="panel">
+      <div class="field"><label>Baseline conversion rate <span>%</span></label><input id="s_p1" type="number" step="0.1" value="5.7"></div>
+      <div class="pair">
+        <div class="field"><label>Lift to detect</label><input id="s_lift" type="number" step="0.1" value="0.5"></div>
+        <div class="field"><label>as</label><select id="s_liftType"><option value="abs">points (abs)</option><option value="rel">% (relative)</option></select></div>
+      </div>
+      <div class="pair">
+        <div class="field"><label>α (false positive)</label><input id="s_alpha" type="number" step="0.01" value="0.05"></div>
+        <div class="field"><label>Power</label><input id="s_power" type="number" step="0.05" value="0.8"></div>
+      </div>
+      <div class="field"><label>Test</label><select id="s_sides"><option value="1">one-sided (B better than A)</option><option value="2">two-sided (any difference)</option></select></div>
+      <div class="field"><label>Visitors per day <span>both arms together</span></label><input id="s_traffic" type="number" step="100" value="3000"></div>
+      <div class="field"><label>Variance</label><select id="s_var"><option value="unpooled">p₁(1−p₁) + p₂(1−p₂)</option><option value="pooled">2p̄(1−p̄), pooled</option></select></div>
+      <label class="check"><input type="checkbox" id="s_table"> Use class table z-values (1.645, 0.842, 1.96)</label>
+      <div class="err" id="s_err"></div>
+    </div>
+    <div class="panel">
+      <div class="result">
+        <div class="stat"><b id="s_n">–</b><span>visitors per arm</span></div>
+        <div class="stat"><b id="s_total">–</b><span>visitors in total</span></div>
+        <div class="stat"><b id="s_days">–</b><span>days of traffic</span></div>
+      </div>
+      <div id="s_explain" class="note"></div>
+      <details open><summary>Formula with your numbers</summary><div class="formula" id="s_formula"></div></details>
+      <details><summary>How n changes with the lift</summary><table id="s_table_lifts"></table>
+        <p class="note">n grows with 1/lift²: halve the lift you want to detect and you need about 4× the visitors.</p></details>
+    </div>
+  </section>
+
+  <!-- ---------------- Tab 2 ---------------- -->
+  <section id="tab-results" class="grid" hidden>
+    <div class="panel">
+      <div class="pair">
+        <div class="field"><label>A visitors</label><input id="r_nA" type="number" value="20000"></div>
+        <div class="field"><label>A conversions</label><input id="r_xA" type="number" value="1140"></div>
+      </div>
+      <div class="pair">
+        <div class="field"><label>B visitors</label><input id="r_nB" type="number" value="20000"></div>
+        <div class="field"><label>B conversions</label><input id="r_xB" type="number" value="1290"></div>
+      </div>
+      <div class="pair">
+        <div class="field"><label>α</label><input id="r_alpha" type="number" step="0.01" value="0.05"></div>
+        <div class="field"><label>Test</label><select id="r_sides"><option value="1">one-sided</option><option value="2">two-sided</option></select></div>
+      </div>
+      <div class="field"><label>Minimum lift that matters <span>points</span></label><input id="r_d0" type="number" step="0.1" value="0.5"></div>
+      <div class="field"><label>SE for the minimum-lift test</label><select id="r_d0se"><option value="pooled">pooled (as in class)</option><option value="unpooled">unpooled</option></select></div>
+      <label class="check"><input type="checkbox" id="r_table"> Use class table z-values</label>
+      <div class="err" id="r_err"></div>
+    </div>
+    <div class="panel">
+      <div class="result">
+        <div class="stat"><b id="r_rates">–</b><span>conversion A → B</span></div>
+        <div class="stat"><b id="r_lift">–</b><span>absolute lift (relative)</span></div>
+        <div class="stat"><b id="r_p">–</b><span id="r_plab">p-value</span></div>
+      </div>
+      <div class="verdict" id="r_v0"></div>
+      <div class="verdict" id="r_v1"></div>
+      <div class="ci" id="r_ci"></div>
+      <div class="note" id="r_cinote"></div>
+      <details open><summary>Formulas with your numbers</summary><div class="formula" id="r_formula"></div></details>
+    </div>
+  </section>
+
+  <!-- ---------------- Tab 3 ---------------- -->
+  <section id="tab-money" class="grid" hidden>
+    <div class="panel">
+      <label class="check"><input type="checkbox" id="m_link" checked> Use the lift and CI from the Results tab</label>
+      <div class="pair">
+        <div class="field"><label>Lift <span>points</span></label><input id="m_lift" type="number" step="0.01" value="0.75"></div>
+        <div class="field"><label>Baseline <span>%</span></label><input id="m_p1" type="number" step="0.1" value="5.7"></div>
+      </div>
+      <div class="pair">
+        <div class="field"><label>CI low <span>pts</span></label><input id="m_lo" type="number" step="0.01" value="0.282"></div>
+        <div class="field"><label>CI high <span>pts</span></label><input id="m_hi" type="number" step="0.01" value="1.218"></div>
+      </div>
+      <div class="field"><label>Visitors per month</label><input id="m_visits" type="number" step="1000" value="90000"></div>
+      <div class="field"><label>Margin per conversion <span>$</span></label><input id="m_margin" type="number" step="1" value="35"></div>
+      <div class="field"><label>One-time cost to build <span>$</span></label><input id="m_build" type="number" step="500" value="18000"></div>
+      <div class="field"><label>Days per month</label><input id="m_days" type="number" step="1" value="30"></div>
+      <div class="err" id="m_err"></div>
+    </div>
+    <div class="panel">
+      <div class="result">
+        <div class="stat"><b id="m_extra">–</b><span>extra conversions / month</span></div>
+        <div class="stat"><b id="m_dollars">–</b><span>extra margin / month</span></div>
+        <div class="stat"><b id="m_payback">–</b><span>payback</span></div>
+      </div>
+      <div class="result">
+        <div class="stat"><b id="m_ci">–</b><span>95% CI, margin / month</span></div>
+        <div class="stat"><b id="m_year">–</b><span>first-year value net of build</span></div>
+        <div class="stat"><b id="m_be">–</b><span>lift needed to pay back in 90 days</span></div>
+      </div>
+      <div class="note" id="m_note"></div>
+      <details open><summary>Formulas with your numbers</summary><div class="formula" id="m_formula"></div></details>
+    </div>
+  </section>
+  <p class="small muted" style="margin-top:20px">Defaults are the Larkspur Air booking-page test from DSO 429 HW4 (1B–1D). Normal quantiles use Acklam's algorithm (relative error &lt; 1.2×10⁻⁹), and p-values a high-precision erfc.</p>
+</div>
+
+<script id="core">
+/* ---------- core statistics (tested by test.mjs) ---------- */
+const AB = (() => {
+  function erfc(x) {                                  // Numerical Recipes erfc (fractional error < 1.2e-7)
+    const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
+    const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+    return x >= 0 ? r : 2 - r;
+  }
+  const Phi = x => 0.5 * erfc(-x / Math.SQRT2);       // standard normal CDF
+  function invPhi(p) {                                // Acklam's inverse normal CDF
+    if (!(p > 0 && p < 1)) return NaN;
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const lo = 0.02425;
+    let q, r;
+    if (p < lo) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    if (p > 1 - lo) return -invPhi(1 - p);
+    q = p - 0.5; r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  // class table values (HW4): one-sided 5% -> 1.645, two-sided 5% -> 1.96, 80% power -> 0.842
+  const TABLE = { 0.95: 1.645, 0.975: 1.96, 0.8: 0.842, 0.9: 1.282, 0.995: 2.576, 0.99: 2.326 };
+  function z(p, table) { if (table && TABLE[p] !== undefined) return TABLE[p]; return invPhi(p); }
+  const zAlpha = (alpha, sides, table) => z(1 - alpha / sides, table);
+
+  // ---- 1. sample size per arm: n = (z_a + z_b)^2 * V / d^2, rounded up ----
+  function sampleSize({ p1, lift, liftType = "abs", alpha = 0.05, power = 0.8, sides = 1, traffic = 3000, variance = "unpooled", table = false }) {
+    const d = liftType === "rel" ? p1 * lift : lift, p2 = p1 + d;
+    if (!(p1 > 0 && p1 < 1)) throw new Error("Baseline rate must be between 0% and 100%.");
+    if (!(d > 0) || !(p2 < 1)) throw new Error("The lift must be positive and keep the new rate below 100%.");
+    if (!(alpha > 0 && alpha < 1) || !(power > 0 && power < 1)) throw new Error("α and power must be between 0 and 1.");
+    const za = zAlpha(alpha, sides, table), zb = z(power, table), pbar = (p1 + p2) / 2;
+    const V = variance === "pooled" ? 2 * pbar * (1 - pbar) : p1 * (1 - p1) + p2 * (1 - p2);
+    const raw = (za + zb) ** 2 * V / (d * d), n = Math.ceil(raw - 1e-9);
+    const days = traffic > 0 ? 2 * n / traffic : NaN;
+    return { p1, p2, d, za, zb, V, raw, n, total: 2 * n, days, daysUp: Math.ceil(days - 1e-9) };
+  }
+
+  // ---- 2. results: pooled z-test vs 0, CI (unpooled), test vs a minimum lift ----
+  function results({ xA, nA, xB, nB, alpha = 0.05, sides = 1, d0 = 0.005, d0se = "pooled", table = false }) {
+    if (!(nA > 0 && nB > 0) || xA < 0 || xB < 0 || xA > nA || xB > nB) throw new Error("Conversions must be between 0 and the number of visitors.");
+    const pA = xA / nA, pB = xB / nB, lift = pB - pA, pool = (xA + xB) / (nA + nB);
+    const sePool = Math.sqrt(pool * (1 - pool) * (1 / nA + 1 / nB));
+    const seUn = Math.sqrt(pA * (1 - pA) / nA + pB * (1 - pB) / nB);
+    const z0 = lift / sePool;
+    const pval = sides === 1 ? 1 - Phi(z0) : 2 * (1 - Phi(Math.abs(z0)));
+    const seMin = d0se === "unpooled" ? seUn : sePool, z1 = (lift - d0) / seMin, p1 = 1 - Phi(z1);   // always one-sided: "at least d0"
+    const zc = zAlpha(alpha, sides, table), zci = z(1 - alpha / 2, table);                          // CI is two-sided 1 - alpha
+    return { pA, pB, lift, rel: lift / pA, pool, sePool, seUn, z0, pval, reject0: pval < alpha, zc,
+      d0, seMin, z1, p1, reject1: p1 < alpha, ci: [lift - zci * seUn, lift + zci * seUn], zci,
+      oneSidedLower: lift - z(1 - alpha, table) * seUn };
+  }
+
+  // ---- 3. money ----
+  function money({ lift, lo, hi, visits, margin, build, days = 30, p1 }) {
+    const extra = visits * lift, dollars = extra * margin, perDay = dollars / days;
+    const payback = dollars > 0 ? build / perDay : Infinity;
+    const ci = [lo * visits * margin, hi * visits * margin];
+    const breakEven90 = build / (90 / days) / (visits * margin);           // lift (abs) that pays back in 90 days
+    return { extra, dollars, perDay, payback, ci, year: 12 * dollars - build, rel: p1 ? lift / p1 : NaN, breakEven90 };
+  }
+  return { erfc, Phi, invPhi, z, zAlpha, TABLE, sampleSize, results, money };
+})();
+if (typeof module !== "undefined") module.exports = AB;
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const num = id => Number($(id).value);
+const f = (x, d = 0) => (isFinite(x) ? x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
+const pc = (x, d = 2) => (100 * x).toFixed(d) + "%";
+const pts = (x, d = 2) => (100 * x).toFixed(d) + " pts";
+const usd = (x, d = 0) => (x < 0 ? "−$" : "$") + f(Math.abs(x), d);
+const pfmt = p => (p < 0.0001 ? p.toExponential(2) : p.toFixed(5));
+let lastResults = null;
+
+function sizeTab() {
+  try {
+    $("s_err").textContent = "";
+    const inp = { p1: num("s_p1") / 100, lift: $("s_liftType").value === "abs" ? num("s_lift") / 100 : num("s_lift") / 100, liftType: $("s_liftType").value,
+      alpha: num("s_alpha"), power: num("s_power"), sides: num("s_sides"), traffic: num("s_traffic"), variance: $("s_var").value, table: $("s_table").checked };
+    const r = AB.sampleSize(inp);
+    $("s_n").textContent = f(r.n); $("s_total").textContent = f(r.total); $("s_days").textContent = isFinite(r.days) ? `${r.days.toFixed(2)} → ${r.daysUp}` : "–";
+    $("s_explain").innerHTML = `To detect ${pc(r.p1, 2)} → ${pc(r.p2, 2)} (${pts(r.d)}, ${pc(r.d / r.p1, 1)} relative) with ${pc(inp.power, 0)} power at α = ${inp.alpha} ${inp.sides === 1 ? "one-sided" : "two-sided"}, you need <b>${f(r.n)} visitors per arm</b>: ${isFinite(r.days) ? `${r.daysUp} days at ${f(inp.traffic)} visitors a day. Round up to whole weeks to cover every weekday.` : ""}`;
+    const Vtxt = inp.variance === "pooled" ? `2·p̄(1−p̄) = 2 × ${((r.p1 + r.p2) / 2).toFixed(4)} × ${(1 - (r.p1 + r.p2) / 2).toFixed(4)}` : `p₁(1−p₁) + p₂(1−p₂) = ${r.p1.toFixed(4)}×${(1 - r.p1).toFixed(4)} + ${r.p2.toFixed(4)}×${(1 - r.p2).toFixed(4)}`;
+    $("s_formula").innerHTML =
+`<span class="c">n per arm = (z_α + z_β)² × V / d²</span>
+z_α = z(1 − ${inp.alpha}${inp.sides === 2 ? "/2" : ""}) = ${r.za.toFixed(4)}      z_β = z(${inp.power}) = ${r.zb.toFixed(4)}
+V   = ${Vtxt} = ${r.V.toFixed(6)}
+d   = ${r.p2.toFixed(4)} − ${r.p1.toFixed(4)} = ${r.d.toFixed(4)}
+n   = (${r.za.toFixed(4)} + ${r.zb.toFixed(4)})² × ${r.V.toFixed(6)} / ${r.d.toFixed(4)}²
+    = ${((r.za + r.zb) ** 2).toFixed(6)} × ${r.V.toFixed(6)} / ${(r.d * r.d).toFixed(8)}
+    = ${r.raw.toFixed(1)}  →  round up: ${f(r.n)}
+<span class="c">days = 2n / visitors per day</span> = ${f(2 * r.n)} / ${f(inp.traffic)} = ${r.days.toFixed(2)}  →  ${r.daysUp} days`;
+    const mults = [0.5, 0.75, 1, 1.5, 2];
+    $("s_table_lifts").innerHTML = "<tr><th>Lift</th><th>New rate</th><th>n per arm</th><th>Days</th></tr>" + mults.map(m => {
+      const q = AB.sampleSize({ ...inp, liftType: "abs", lift: r.d * m });
+      return `<tr${m === 1 ? ' style="font-weight:700"' : ""}><td>${pts(q.d)}</td><td>${pc(q.p2)}</td><td>${f(q.n)}</td><td>${q.daysUp}</td></tr>`;
+    }).join("");
+  } catch (e) { $("s_err").textContent = e.message; ["s_n", "s_total", "s_days"].forEach(i => ($(i).textContent = "–")); }
+}
+
+function resultsTab() {
+  try {
+    $("r_err").textContent = "";
+    const inp = { xA: num("r_xA"), nA: num("r_nA"), xB: num("r_xB"), nB: num("r_nB"), alpha: num("r_alpha"), sides: num("r_sides"), d0: num("r_d0") / 100, d0se: $("r_d0se").value, table: $("r_table").checked };
+    const r = AB.results(inp); lastResults = r;
+    $("r_rates").textContent = `${pc(r.pA)} → ${pc(r.pB)}`;
+    $("r_lift").textContent = `${pts(r.lift)} (${r.rel >= 0 ? "+" : ""}${pc(r.rel, 1)})`;
+    $("r_p").textContent = pfmt(r.pval); $("r_plab").textContent = `${inp.sides === 1 ? "one" : "two"}-sided p-value, pooled z = ${r.z0.toFixed(2)}`;
+    const v0 = $("r_v0"), v1 = $("r_v1");
+    v0.className = "verdict " + (r.reject0 ? "yes" : "no");
+    v0.textContent = r.reject0 ? `✓ Significant: B ${inp.sides === 1 ? "converts better than" : "differs from"} A (p = ${pfmt(r.pval)} < ${inp.alpha}).` : `✗ Not significant: can't rule out no difference (p = ${pfmt(r.pval)} ≥ ${inp.alpha}).`;
+    v1.className = "verdict " + (r.reject1 ? "yes" : "no");
+    v1.textContent = r.reject1 ? `✓ The lift is at least ${pts(r.d0, 2)} (one-sided p = ${pfmt(r.p1)}).` : `✗ Not shown to be at least ${pts(r.d0, 2)} (one-sided p = ${pfmt(r.p1)}). The lift may be real but smaller than the bar.`;
+    // CI picture
+    const lo = Math.min(0, r.ci[0], r.d0) - 0.002, hi = Math.max(r.ci[1], r.d0) + 0.002, P = x => (100 * (x - lo) / (hi - lo)).toFixed(2) + "%";
+    $("r_ci").innerHTML = `<div class="axis"></div><div class="bar" style="left:${P(r.ci[0])};width:calc(${P(r.ci[1])} - ${P(r.ci[0])})"></div><div class="pt" style="left:${P(r.lift)}"></div>
+      <div class="mark" style="left:${P(0)};border-color:var(--muted)"></div><div class="lab" style="left:${P(0)}">0</div>
+      <div class="mark" style="left:${P(r.d0)};border-color:var(--bad)"></div><div class="lab" style="left:${P(r.d0)};color:var(--bad)">bar ${pts(r.d0, 1)}</div>
+      <div class="lab" style="left:${P(r.ci[0])};top:0">${pts(r.ci[0])}</div><div class="lab" style="left:${P(r.ci[1])};top:0">${pts(r.ci[1])}</div>`;
+    $("r_cinote").textContent = `${pc(1 - inp.alpha, 0)} confidence interval for the lift: [${pts(r.ci[0])}, ${pts(r.ci[1])}] (unpooled SE). ${r.ci[0] > 0 ? "It excludes 0" : "It includes 0"}${r.ci[0] > r.d0 ? ` and sits entirely above the ${pts(r.d0, 1)} bar.` : r.ci[1] < r.d0 ? ` and sits entirely below the ${pts(r.d0, 1)} bar.` : `, but it straddles the ${pts(r.d0, 1)} bar.`}`;
+    $("r_formula").innerHTML =
+`<span class="c">rates</span>        p_A = ${inp.xA}/${inp.nA} = ${r.pA.toFixed(4)}    p_B = ${inp.xB}/${inp.nB} = ${r.pB.toFixed(4)}    lift = ${r.lift.toFixed(4)}
+<span class="c">pooled rate</span>  p̂ = (${inp.xA} + ${inp.xB}) / (${inp.nA} + ${inp.nB}) = ${r.pool.toFixed(5)}
+<span class="c">pooled SE</span>    √(p̂(1−p̂)(1/n_A + 1/n_B)) = √(${r.pool.toFixed(5)} × ${(1 - r.pool).toFixed(5)} × ${(1 / inp.nA + 1 / inp.nB).toExponential(3)}) = ${r.sePool.toFixed(6)}
+<span class="c">test vs 0</span>    z = ${r.lift.toFixed(4)} / ${r.sePool.toFixed(6)} = ${r.z0.toFixed(4)}    p = ${inp.sides === 1 ? "1 − Φ(z)" : "2(1 − Φ(|z|))"} = ${pfmt(r.pval)}    (critical z = ${r.zc.toFixed(3)})
+<span class="c">vs minimum</span>   z = (${r.lift.toFixed(4)} − ${r.d0.toFixed(4)}) / ${r.seMin.toFixed(6)} = ${r.z1.toFixed(4)}    one-sided p = 1 − Φ(z) = ${pfmt(r.p1)}
+<span class="c">unpooled SE</span>  √(p_A(1−p_A)/n_A + p_B(1−p_B)/n_B) = ${r.seUn.toFixed(6)}
+<span class="c">${pc(1 - inp.alpha, 0)} CI</span>       ${r.lift.toFixed(4)} ± ${r.zci.toFixed(3)} × ${r.seUn.toFixed(6)} = [${r.ci[0].toFixed(5)}, ${r.ci[1].toFixed(5)}]
+<span class="c">why two SEs?</span> the test assumes H0 (no difference) so it pools the rates; the CI estimates the difference, so it uses each arm's own rate.`;
+  } catch (e) { $("r_err").textContent = e.message; lastResults = null; }
+  moneyTab();
+}
+
+function moneyTab() {
+  try {
+    $("m_err").textContent = "";
+    const link = $("m_link").checked && lastResults;
+    ["m_lift", "m_lo", "m_hi", "m_p1"].forEach(i => ($(i).disabled = !!link));
+    if (link) { $("m_lift").value = (100 * lastResults.lift).toFixed(4); $("m_lo").value = (100 * lastResults.ci[0]).toFixed(4); $("m_hi").value = (100 * lastResults.ci[1]).toFixed(4); $("m_p1").value = (100 * lastResults.pA).toFixed(4); }
+    const inp = { lift: num("m_lift") / 100, lo: num("m_lo") / 100, hi: num("m_hi") / 100, visits: num("m_visits"), margin: num("m_margin"), build: num("m_build"), days: num("m_days") || 30, p1: num("m_p1") / 100 };
+    if (link) Object.assign(inp, { lift: lastResults.lift, lo: lastResults.ci[0], hi: lastResults.ci[1], p1: lastResults.pA });   // exact, not the rounded display
+    const r = AB.money(inp);
+    $("m_extra").textContent = f(r.extra, 0); $("m_dollars").textContent = usd(r.dollars);
+    $("m_payback").textContent = isFinite(r.payback) ? `${r.payback.toFixed(1)} days` : "never";
+    $("m_ci").textContent = `${usd(r.ci[0])} – ${usd(r.ci[1])}`; $("m_year").textContent = usd(r.year); $("m_be").textContent = pts(r.breakEven90, 3);
+    $("m_note").textContent = r.ci[0] > 0 ? `Even at the low end of the CI, the change earns ${usd(r.ci[0])} a month and pays back in ${(inp.build / (r.ci[0] / inp.days)).toFixed(0)} days.` : `The CI includes zero or a loss, so the payback isn't guaranteed.`;
+    $("m_formula").innerHTML =
+`<span class="c">extra conversions</span>  visitors × lift = ${f(inp.visits)} × ${inp.lift.toFixed(4)} = ${f(r.extra, 1)} / month
+<span class="c">extra margin</span>       ${f(r.extra, 1)} × $${inp.margin} = ${usd(r.dollars, 2)} / month
+<span class="c">payback</span>            build / (margin per day) = $${f(inp.build)} / (${usd(r.dollars, 2)} / ${inp.days}) = ${isFinite(r.payback) ? r.payback.toFixed(2) + " days" : "never"}
+<span class="c">CI in dollars</span>      [${inp.lo.toFixed(5)}, ${inp.hi.toFixed(5)}] × ${f(inp.visits)} × $${inp.margin} = [${usd(r.ci[0])}, ${usd(r.ci[1])}] / month
+<span class="c">first year</span>         12 × ${usd(r.dollars)} − $${f(inp.build)} = ${usd(r.year)}
+<span class="c">90-day break-even</span>  $${f(inp.build)} / (90/${inp.days} months × ${f(inp.visits)} × $${inp.margin}) = ${r.breakEven90.toFixed(5)} (${pts(r.breakEven90, 3)})`;
+  } catch (e) { $("m_err").textContent = e.message; }
+}
+
+// tabs
+document.querySelectorAll("[role=tab]").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+function setTab(t) { document.querySelectorAll("[role=tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t)); ["size", "results", "money"].forEach(k => ($("tab-" + k).hidden = k !== t)); history.replaceState(null, "", "#" + t + (location.search || "")); }
+document.querySelectorAll("#tab-size input,#tab-size select").forEach(e => e.addEventListener("input", sizeTab));
+document.querySelectorAll("#tab-results input,#tab-results select").forEach(e => e.addEventListener("input", resultsTab));
+document.querySelectorAll("#tab-money input").forEach(e => e.addEventListener("input", moneyTab));
+// shareable link: every input's value in the query string
+const ids = [...document.querySelectorAll("input,select")].map(e => e.id).filter(Boolean);
+const qs = new URLSearchParams(location.search);
+ids.forEach(id => { if (qs.has(id)) { const e = $(id); e.type === "checkbox" ? (e.checked = qs.get(id) === "1") : (e.value = qs.get(id)); } });
+$("share").addEventListener("click", async () => {
+  const p = new URLSearchParams(); ids.forEach(id => { const e = $(id); p.set(id, e.type === "checkbox" ? (e.checked ? "1" : "0") : e.value); });
+  const url = location.origin + location.pathname + "?" + p + location.hash;
+  try { await navigator.clipboard.writeText(url); $("share").textContent = "✓ Copied"; } catch (e) { prompt("Copy this link:", url); }
+  setTimeout(() => ($("share").textContent = "🔗 Copy link"), 1500);
+});
+sizeTab(); resultsTab();
+if (["size", "results", "money"].includes(location.hash.slice(1))) setTab(location.hash.slice(1));
+</script>
+</body>
+</html>
